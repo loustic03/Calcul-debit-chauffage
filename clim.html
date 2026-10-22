@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Puissance clim par pièce</title>
+<meta name="description" content="Estimation pièce par pièce des besoins de chauffage et de climatisation à partir des surfaces, de l'isolation, de l'exposition et de la zone climatique — avec la taille de climatiseur conseillée.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231d6fb8'/%3E%3Cpath d='M16 6v20M7.3 11l17.4 10M7.3 21l17.4-10' stroke='%23fff' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+<style>
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+.layout>*{min-width:0}
+@media (max-width:900px){.layout{grid-template-columns:minmax(0,1fr)}}
+.params{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:4px 14px}
+.params .field{margin-bottom:12px}
+.rooms{display:flex;flex-direction:column;gap:12px}
+.room{border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--surface)}
+.room-head{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+.room-head input{flex:1;min-width:0;border:0;border-bottom:1px dashed var(--line);background:transparent;color:var(--ink);font:inherit;font-weight:700;font-size:1rem;padding:4px 2px;outline:none}
+.room-head input:focus{border-bottom-color:var(--accent)}
+.room-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:10px}
+.room-grid .lbl{font-size:.75rem;color:var(--muted);font-weight:600;margin-bottom:4px}
+.room-grid select{width:100%;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--ink);font:inherit;font-size:.92rem;padding:9px 8px;min-width:0}
+.room-grid .combo input{font-size:.98rem;padding:9px 10px}
+.checks{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:.88rem}
+.checks label{display:flex;align-items:center;gap:6px;cursor:pointer}
+.checks input{width:17px;height:17px;accent-color:var(--accent)}
+.room-res{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+.room-res div{border-radius:9px;padding:8px 10px;background:var(--surface-2)}
+.room-res b{display:block;font-variant-numeric:tabular-nums;font-size:1.02rem}
+.room-res span{font-size:.74rem;color:var(--muted)}
+.room-res .hot{box-shadow:inset 3px 0 0 var(--accent)}
+.room-res .cold{box-shadow:inset 3px 0 0 var(--cold)}
+.tot-big{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.tot-big div{border-radius:10px;padding:12px;background:var(--surface-2)}
+.tot-big .v{font-size:1.75rem;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.1}
+.tot-big .v small{font-size:.5em;color:var(--muted);margin-left:3px;font-weight:600}
+.tot-big .k{font-size:.78rem;color:var(--muted);display:flex;align-items:center;gap:6px}
+.kv{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:.9rem}
+.kv:last-child{border-bottom:0}
+.kv b{font-variant-numeric:tabular-nums;text-align:right}
+#recap td,#recap th{padding:7px 6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="nav" aria-label="Outils"><a href="./">Débit chauffage</a><a href="clim.html" aria-current="page">Puissance clim &amp; chauffage par pièce</a></nav>
+  <header>
+    <div>
+      <p class="eyebrow">Génie climatique · Climatisation &amp; PAC air/air</p>
+      <h1>Puissance de climatisation et de chauffage par pièce</h1>
+      <p class="lede">Saisissez vos pièces : l'outil estime le besoin en chaud et en froid de chacune, la taille de climatiseur conseillée et le total du logement.</p>
+    </div>
+    <button class="theme-btn" id="themeBtn" title="Changer le thème" aria-label="Changer le thème">◐</button>
+  </header>
+
+  <div class="layout">
+    <div>
+      <section class="card">
+        <h2>Logement</h2>
+        <div class="params">
+          <div class="field"><label for="iso">Niveau d'isolation</label><select id="iso" class="full"></select></div>
+          <div class="field"><label for="zh">Zone climatique hiver</label><select id="zh" class="full"></select></div>
+          <div class="field"><label for="alt">Altitude</label>
+            <div class="combo"><input id="alt" type="text" inputmode="numeric"><span class="unit">m</span></div>
+            <div class="hint" id="tbHint"></div></div>
+          <div class="field"><label for="ze">Climat estival</label><select id="ze" class="full"></select></div>
+          <div class="field"><label for="hsp">Hauteur sous plafond par défaut</label>
+            <div class="combo"><input id="hsp" type="text" inputmode="decimal"><span class="unit">m</span></div></div>
+        </div>
+      </section>
+
+      <section class="card more">
+        <h2>Pièces <button class="btn primary" id="addRoom" type="button">+ Ajouter une pièce</button></h2>
+        <div class="rooms" id="rooms"></div>
+      </section>
+    </div>
+
+    <aside class="card result" aria-live="polite">
+      <h2>Total du logement</h2>
+      <div class="tot-big">
+        <div><div class="k"><span class="dot" style="background:var(--accent)"></span>Chaud</div><div class="v" id="totC">—</div></div>
+        <div><div class="k"><span class="dot" style="background:var(--cold)"></span>Froid</div><div class="v" id="totF">—</div></div>
+      </div>
+      <div class="kv"><span>Surface totale</span><b id="totS">—</b></div>
+      <div class="kv"><span>Température de base</span><b id="totTb">—</b></div>
+      <div class="kv"><span>Ratio chaud</span><b id="ratC">—</b></div>
+      <div class="kv"><span>Ratio froid</span><b id="ratF">—</b></div>
+      <div class="field" style="margin:14px 0 6px">
+        <label for="simu">Simultanéité (multisplit)</label>
+        <div class="combo"><input id="simu" type="text" inputmode="numeric"><span class="unit">%</span></div>
+        <div class="hint">Part des pièces climatisées en même temps à la pointe. 100 % = somme stricte.</div>
+      </div>
+      <div class="kv"><span>Groupe extérieur, froid</span><b id="grpF">—</b></div>
+      <div class="kv"><span>Groupe extérieur, chaud à T base</span><b id="grpC">—</b></div>
+      <div class="row-actions" style="margin-top:14px">
+        <button class="btn" id="shareBtn" type="button">Copier le lien</button>
+        <button class="btn" id="printBtn" type="button">Imprimer</button>
+        <button class="btn" id="resetBtn" type="button">Réinitialiser</button>
+      </div>
+    </aside>
+  </div>
+
+  <section class="card more">
+    <h2>Récapitulatif</h2>
+    <div class="tbl-wrap">
+      <table id="recap">
+        <thead><tr><th>Pièce</th><th class="n">m²</th><th class="n">Chaud (W)</th><th class="n">Froid (W)</th><th class="n">Unité conseillée</th></tr></thead>
+        <tbody></tbody>
+        <tfoot><tr><td>Total</td><td class="n" id="fS"></td><td class="n" id="fC"></td><td class="n" id="fF"></td><td></td></tr></tfoot>
+      </table>
+    </div>
+  </section>
+
+  <section class="card more"><div class="prose">
+    <h2>Méthode</h2>
+    <p><b>Chauffage</b> — déperditions : <span class="formula" style="display:inline-block;padding:4px 8px">P = G × V × (T<sub>int</sub> − T<sub>base</sub>)</span></p>
+    <p>G est le coefficient volumique de déperditions (de 0,55 W/(m³·K) pour un logement très bien isolé à 1,6 pour un logement ancien non isolé), V le volume de la pièce, T<sub>int</sub> la consigne (19 °C, 20 °C en séjour, 22 °C en salle de bain) et T<sub>base</sub> la température extérieure de base de la zone, abaissée de 1 °C par tranche de 200 m au-dessus de 200 m d'altitude. Pièce sous toiture ou grandes baies : +10 %.</p>
+    <p><b>Climatisation</b> — <span class="formula" style="display:inline-block;padding:4px 8px">P = V × q × f<sub>expo</sub> × f<sub>climat</sub> + 100 W × occupants + appareils</span></p>
+    <p>q est une charge de référence de 25 à 45 W/m³ selon l'isolation. Exposition : nord ×0,9, est ×1, sud ×1,1, ouest ×1,15 (soleil de fin de journée, le plus pénalisant). Sous toiture ×1,2, grandes baies ×1,15. Cuisine +300 W, bureau +150 W.</p>
+    <details><summary>Choisir le climatiseur</summary>
+      <p>L'unité conseillée est la plus petite puissance frigorifique nominale du commerce couvrant le besoin (2,0 · 2,5 · 3,5 · 4,2 · 5,0 · 6,0 · 7,1 kW). Les équivalences en BTU/h sont les appellations commerciales usuelles (1 kW ≈ 3 412 BTU/h).</p>
+      <p>Pour le chauffage par PAC air/air, vérifiez la <b>puissance calorifique disponible à la température de base</b> dans la documentation du fabricant : elle baisse fortement par grand froid, parfois de 30 à 40 % à −10 °C.</p>
+    </details>
+    <details><summary>Limites</summary>
+      <ul>
+        <li>Méthode d'avant-projet par ratios : elle ne remplace ni un calcul de déperditions NF EN 12831 ni un bilan de charges de climatisation.</li>
+        <li>Les apports solaires réels dépendent de la surface vitrée, des protections (volets, stores) et de l'inertie du bâtiment.</li>
+        <li>Les coefficients G et q sont des valeurs typiques : un DPE ou un audit permet de les affiner.</li>
+      </ul>
+    </details>
+  </div></section>
+
+  <footer>Outil libre, calcul côté navigateur. Résultats indicatifs : faites valider le dimensionnement par un professionnel avant achat.</footer>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="clim.js"></script>
+<script>
+(function(){
+'use strict';
+var K = window.Clim, $ = function(id){ return document.getElementById(id); };
+var fmt = function(v, d){ return v.toLocaleString('fr-FR', {minimumFractionDigits:0, maximumFractionDigits:d||0}); };
+var esc = function(s){ return String(s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
+var kW = function(w){ return w >= 1000 ? fmt(w/1000, 2) + '<small>kW</small>' : fmt(w) + '<small>W</small>'; };
+var kWt = function(w){ return w >= 1000 ? fmt(w/1000, 2) + ' kW' : fmt(w) + ' W'; };
+
+var DEF = { iso:'rt2000', zh:'E', alt:'0', ze:'centre', hsp:'2,5', simu:'100' };
+var DEF_ROOMS = [
+  { n:'Séjour',    t:'sejour',  s:'30', h:'', e:'S', o:'3', toit:0, baies:1 },
+  { n:'Chambre 1', t:'chambre', s:'12', h:'', e:'E', o:'2', toit:0, baies:0 },
+  { n:'Chambre 2', t:'chambre', s:'10', h:'', e:'O', o:'1', toit:1, baies:0 }
+];
+var st, rooms;
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+function reset(){ st = clone(DEF); rooms = clone(DEF_ROOMS); }
+
+function fill(sel, obj){ $(sel).innerHTML = Object.keys(obj).map(function(k){ return '<option value="' + k + '">' + esc(obj[k].label) + '</option>'; }).join(''); }
+fill('iso', K.ISOLATION); fill('zh', K.ZONES_HIVER); fill('ze', K.ZONES_ETE);
+var optTypes = Object.keys(K.TYPES).map(function(k){ return '<option value="' + k + '">' + K.TYPES[k].label + '</option>'; }).join('');
+var optExpo  = Object.keys(K.EXPOSITIONS).map(function(k){ return '<option value="' + k + '">' + K.EXPOSITIONS[k].label + '</option>'; }).join('');
+
+function syncGlobal(){ ['iso','zh','alt','ze','hsp','simu'].forEach(function(k){ $(k).value = st[k]; }); }
+
+function renderRooms(){
+  $('rooms').innerHTML = rooms.map(function(r, i){
+    return '<div class="room" data-i="' + i + '">' +
+      '<div class="room-head"><input data-k="n" value="' + esc(r.n) + '" aria-label="Nom de la pièce"><button class="x" data-del aria-label="Supprimer la pièce">×</button></div>' +
+      '<div class="room-grid">' +
+        '<div><div class="lbl">Type</div><select data-k="t">' + optTypes + '</select></div>' +
+        '<div><div class="lbl">Surface</div><div class="combo"><input data-k="s" inputmode="decimal" value="' + esc(r.s) + '"><span class="unit">m²</span></div></div>' +
+        '<div><div class="lbl">Hauteur</div><div class="combo"><input data-k="h" inputmode="decimal" value="' + esc(r.h) + '" placeholder="' + esc(st.hsp) + '"><span class="unit">m</span></div></div>' +
+        '<div><div class="lbl">Exposition</div><select data-k="e">' + optExpo + '</select></div>' +
+        '<div><div class="lbl">Occupants</div><div class="combo"><input data-k="o" inputmode="numeric" value="' + esc(r.o) + '"><span class="unit">pers.</span></div></div>' +
+      '</div>' +
+      '<div class="checks"><label><input type="checkbox" data-k="toit"' + (r.toit ? ' checked' : '') + '> Sous toiture / combles</label>' +
+      '<label><input type="checkbox" data-k="baies"' + (r.baies ? ' checked' : '') + '> Grandes baies vitrées</label></div>' +
+      '<div class="room-res"></div></div>';
+  }).join('');
+  Array.prototype.forEach.call($('rooms').children, function(el, i){
+    el.querySelector('[data-k="t"]').value = rooms[i].t;
+    el.querySelector('[data-k="e"]').value = rooms[i].e;
+  });
+}
+
+function compute(){
+  var tb = K.tBase(st.zh, st.alt);
+  $('tbHint').textContent = 'Température de base retenue : ' + tb + ' °C';
+  var params = { isolation: st.iso, tbase: tb, zoneEte: st.ze };
+  var S = 0, C = 0, F = 0, n = 0, rows = [];
+  rooms.forEach(function(r, i){
+    var res = K.piece({ surface:r.s, hauteur: r.h === '' ? st.hsp : r.h, type:r.t, expo:r.e, toit:!!r.toit, baies:!!r.baies, occupants:r.o }, params);
+    var box = $('rooms').children[i] && $('rooms').children[i].querySelector('.room-res');
+    var unit = res ? K.taille(res.froid) : null;
+    var uTxt = !res ? '—' : unit ? fmt(unit.kw, 1) + ' kW · ' + fmt(unit.btu) + ' BTU' : '> 7,1 kW : 2 unités';
+    if (box) box.innerHTML = res
+      ? '<div class="hot"><b>' + kWt(res.chaud) + '</b><span>Chaud · ' + fmt(res.tint) + ' °C</span></div>' +
+        '<div class="cold"><b>' + kWt(res.froid) + '</b><span>Froid</span></div>' +
+        '<div><b>' + (unit ? fmt(unit.kw, 1) + ' kW' : '> 7,1 kW') + '</b><span>' + (unit ? fmt(unit.btu) + ' BTU/h' : '2 unités') + '</span></div>'
+      : '<div style="grid-column:1/-1"><span>Renseignez la surface et la hauteur.</span></div>';
+    if (res) { S += K.num(r.s); C += res.chaud; F += res.froid; n++; }
+    rows.push('<tr><td>' + esc(r.n || 'Pièce') + '</td><td class="n">' + (res ? fmt(K.num(r.s), 1) : '—') + '</td><td class="n">' + (res ? fmt(res.chaud) : '—') + '</td><td class="n">' + (res ? fmt(res.froid) : '—') + '</td><td class="n">' + uTxt + '</td></tr>');
+  });
+  $('recap').tBodies[0].innerHTML = rows.join('');
+  var simu = K.num(st.simu); if (!(simu > 0)) simu = 100;
+  $('totS').textContent = n ? fmt(S, 1) + ' m²' : '—';
+  $('totTb').textContent = tb + ' °C';
+  $('totC').innerHTML = n ? kW(C) : '—';
+  $('totF').innerHTML = n ? kW(F) : '—';
+  $('ratC').textContent = n && S ? fmt(C/S) + ' W/m²' : '—';
+  $('ratF').textContent = n && S ? fmt(F/S) + ' W/m²' : '—';
+  $('grpF').textContent = n ? kWt(F * simu / 100) : '—';
+  $('grpC').textContent = n ? kWt(C) : '—';
+  $('fS').textContent = n ? fmt(S, 1) : ''; $('fC').textContent = n ? fmt(C) : ''; $('fF').textContent = n ? fmt(F) : '';
+  save();
+}
+
+// Lien partageable
+function save(){
+  var p = new URLSearchParams();
+  Object.keys(st).forEach(function(k){ if (st[k] !== DEF[k]) p.set(k, st[k]); });
+  p.set('p', JSON.stringify(rooms.map(function(r){ return [r.n, r.t, r.s, r.h, r.e, r.o, r.toit ? 1 : 0, r.baies ? 1 : 0]; })));
+  try { history.replaceState(null, '', '#' + p.toString()); } catch(e){}
+}
+function load(){
+  reset();
+  var p = new URLSearchParams(location.hash.slice(1));
+  Object.keys(DEF).forEach(function(k){ if (p.has(k)) st[k] = p.get(k); });
+  if (p.has('p')) try {
+    rooms = JSON.parse(p.get('p')).map(function(a){ return { n:a[0]||'', t:a[1]||'autre', s:a[2]||'', h:a[3]||'', e:a[4]||'E', o:a[5]||'0', toit:a[6], baies:a[7] }; });
+  } catch(e){}
+}
+
+// Événements
+['iso','zh','ze'].forEach(function(k){ $(k).addEventListener('change', function(e){ st[k] = e.target.value; compute(); }); });
+['alt','simu'].forEach(function(k){ $(k).addEventListener('input', function(e){ st[k] = e.target.value; compute(); }); });
+$('hsp').addEventListener('input', function(e){
+  st.hsp = e.target.value;
+  document.querySelectorAll('[data-k="h"]').forEach(function(inp){ inp.placeholder = st.hsp; });
+  compute();
+});
+function onRoom(e){
+  var el = e.target.closest('.room'); if (!el || !e.target.dataset.k) return;
+  var r = rooms[+el.dataset.i], k = e.target.dataset.k;
+  r[k] = e.target.type === 'checkbox' ? (e.target.checked ? 1 : 0) : e.target.value;
+  if (k === 't' && /^(Pièce|Chambre|Séjour|Cuisine|Bureau|Salle de bain|Autre)( \d+)?$/.test(r.n)) {
+    var same = rooms.filter(function(x){ return x.t === r.t; }).length;
+    r.n = K.TYPES[r.t].label.split(' /')[0] + (same > 1 ? ' ' + same : '');
+    el.querySelector('[data-k="n"]').value = r.n;
+  }
+  compute();
+}
+$('rooms').addEventListener('input', onRoom);
+$('rooms').addEventListener('change', onRoom);
+$('rooms').addEventListener('click', function(e){
+  if (!e.target.hasAttribute('data-del')) return;
+  rooms.splice(+e.target.closest('.room').dataset.i, 1); renderRooms(); compute();
+});
+$('addRoom').addEventListener('click', function(){
+  rooms.push({ n:'Pièce ' + (rooms.length + 1), t:'chambre', s:'', h:'', e:'E', o:'1', toit:0, baies:0 });
+  renderRooms(); compute();
+  $('rooms').lastElementChild.querySelector('[data-k="s"]').focus();
+});
+$('resetBtn').addEventListener('click', function(){ reset(); syncGlobal(); renderRooms(); compute(); });
+$('printBtn').addEventListener('click', function(){ window.print(); });
+$('shareBtn').addEventListener('click', function(){
+  var url = location.href, done = function(){ toast('Lien copié'); };
+  if (navigator.clipboard) navigator.clipboard.writeText(url).then(done, function(){ prompt('Copiez ce lien :', url); });
+  else prompt('Copiez ce lien :', url);
+});
+function toast(t){ var el = $('toast'); el.textContent = t; el.classList.add('show'); setTimeout(function(){ el.classList.remove('show'); }, 1600); }
+
+var root = document.documentElement;
+try { var th = localStorage.getItem('theme'); if (th) root.dataset.theme = th; } catch(e){}
+$('themeBtn').addEventListener('click', function(){
+  var dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  root.dataset.theme = dark ? 'light' : 'dark';
+  try { localStorage.setItem('theme', root.dataset.theme); } catch(e){}
+});
+
+load(); syncGlobal(); renderRooms(); compute();
+})();
+</script>
+</body>
+</html>
