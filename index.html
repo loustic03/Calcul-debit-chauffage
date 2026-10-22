@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Débit de chauffage</title>
+<meta name="description" content="Calcul du débit d'eau d'un radiateur, d'un plancher chauffant ou d'un générateur à partir de la puissance et du ΔT — et calcul inverse de la puissance depuis un débit mesuré.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23c2410c'/%3E%3Cpath d='M16 6c4 5 7 8.5 7 12.5A7 7 0 0 1 9 18.5C9 14.5 12 11 16 6z' fill='%23fff'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#f6f5f2; --surface:#ffffff; --surface-2:#f0eee9; --ink:#1c1b19; --muted:#6b675f; --line:#e2dfd8;
+  --accent:#c2410c; --accent-ink:#ffffff; --accent-soft:#fdeee5; --cold:#1d6fb8; --warn:#a15c00; --warn-soft:#fff4dd;
+  --radius:12px; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#141312; --surface:#1d1c1a; --surface-2:#262422; --ink:#eeebe5; --muted:#a19c93; --line:#34312d;
+  --accent:#f0773d; --accent-ink:#1a0d06; --accent-soft:#3a2216; --cold:#6aaee8; --warn:#f2b24c; --warn-soft:#352812;
+}}
+:root[data-theme="dark"]{
+  --bg:#141312; --surface:#1d1c1a; --surface-2:#262422; --ink:#eeebe5; --muted:#a19c93; --line:#34312d;
+  --accent:#f0773d; --accent-ink:#1a0d06; --accent-soft:#3a2216; --cold:#6aaee8; --warn:#f2b24c; --warn-soft:#352812;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1080px;margin:0 auto;padding:24px 16px 64px}
+header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px}
+.eyebrow{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:600;margin:0 0 4px}
+h1{font-size:clamp(1.5rem,3.4vw,2.1rem);line-height:1.15;margin:0 0 6px;letter-spacing:-.01em}
+.lede{color:var(--muted);margin:0;max-width:62ch}
+.theme-btn{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;width:40px;height:40px;cursor:pointer;font-size:1.05rem}
+.grid>*{min-width:0}
+.grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:16px;align-items:start}
+@media (max-width:820px){.grid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:560px){.hide-sm{display:none}.card{padding:16px}.conv b{font-size:.95rem}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:20px}
+.card h2{font-size:1rem;margin:0 0 14px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--surface-2);border-radius:10px;padding:4px;gap:4px;margin-bottom:18px}
+.seg button{border:0;background:transparent;color:var(--muted);padding:9px 8px;border-radius:7px;font:inherit;font-weight:600;font-size:.92rem;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.field{margin-bottom:16px}
+.field>label,.lbl{display:block;font-size:.85rem;font-weight:600;margin-bottom:6px}
+.hint{font-size:.8rem;color:var(--muted);margin-top:5px}
+.combo{display:flex;border:1px solid var(--line);border-radius:9px;background:var(--surface);overflow:hidden}
+.combo:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.combo input{flex:1;width:0;min-width:0;border:0;background:transparent;color:var(--ink);font:inherit;font-size:1.05rem;padding:10px 12px;outline:none;font-variant-numeric:tabular-nums}
+.combo select,.combo .unit{border:0;border-left:1px solid var(--line);background:var(--surface-2);color:var(--ink);font:inherit;font-size:.9rem;padding:0 10px;outline:none}
+.combo .unit{display:flex;align-items:center;color:var(--muted)}
+select.full{width:100%;min-width:0;text-overflow:ellipsis;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--ink);font:inherit;padding:10px 12px}
+select.full:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.temps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.temps .tag{font-size:.75rem;color:var(--muted);margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.row-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:8px 12px;font:inherit;font-size:.88rem;cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.result{position:sticky;top:16px}
+.big{font-size:clamp(2.2rem,6vw,3.1rem);font-weight:700;letter-spacing:-.02em;line-height:1.05;font-variant-numeric:tabular-nums;margin:2px 0 4px}
+.big small{font-size:.42em;font-weight:600;color:var(--muted);margin-left:6px;letter-spacing:0}
+.big-lbl{font-size:.85rem;color:var(--muted)}
+.empty{color:var(--muted);padding:24px 0}
+.conv{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:16px 0}
+.conv div{background:var(--surface-2);border-radius:9px;padding:10px}
+.conv b{display:block;font-variant-numeric:tabular-nums;font-size:1.05rem}
+.conv span{font-size:.78rem;color:var(--muted)}
+.formula{font-family:var(--mono);font-size:.86rem;background:var(--surface-2);border-radius:9px;padding:12px;overflow-wrap:anywhere}
+.note{font-size:.85rem;border-radius:9px;padding:10px 12px;margin-top:12px;background:var(--warn-soft);color:var(--ink);border-left:3px solid var(--warn)}
+.note.info{background:var(--accent-soft);border-left-color:var(--accent)}
+section.more{margin-top:16px}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line)}
+th{font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tbody tr.pick{cursor:pointer}
+tbody tr.pick:hover{background:var(--surface-2)}
+tbody tr.on{background:var(--accent-soft)}
+.tbl-wrap{overflow-x:auto;margin:0 -4px}
+.em-row input{width:100%;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink);font:inherit;padding:7px 8px}
+.em-row input.p{text-align:right;max-width:110px}
+.x{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:1.1rem;padding:4px 8px}
+tfoot td{font-weight:700;border-bottom:0}
+.prose{max-width:72ch}
+.prose h3{font-size:1rem;margin:18px 0 6px}
+.prose p,.prose li{color:var(--ink)}
+.prose .muted{color:var(--muted)}
+details{border-top:1px solid var(--line);padding:12px 0}
+details summary{cursor:pointer;font-weight:600}
+footer{margin-top:28px;color:var(--muted);font-size:.82rem}
+footer a{color:inherit}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);padding:9px 14px;border-radius:8px;font-size:.88rem;opacity:0;transition:.2s;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%)}
+.hidden{display:none!important}
+@media print{.theme-btn,.row-actions,.seg,.x,#addEm,footer{display:none!important}body{background:#fff}.card{border-color:#ccc}.result{position:static}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <p class="eyebrow">Génie climatique · Chauffage</p>
+      <h1>Débit d'un radiateur ou d'un circuit de chauffage</h1>
+      <p class="lede">Débit d'eau d'un émetteur, d'une boucle de plancher ou d'un générateur à partir de sa puissance et de l'écart départ/retour — ou la puissance transportée par un débit mesuré.</p>
+    </div>
+    <button class="theme-btn" id="themeBtn" title="Changer le thème" aria-label="Changer le thème">◐</button>
+  </header>
+
+  <div class="grid">
+    <!-- PARAMÈTRES -->
+    <div class="card">
+      <h2>Paramètres</h2>
+      <div class="seg" role="group" aria-label="Sens du calcul">
+        <button type="button" data-mode="p2q" aria-pressed="true">Puissance → Débit</button>
+        <button type="button" data-mode="q2p" aria-pressed="false">Débit → Puissance</button>
+      </div>
+
+      <div class="field" id="fP">
+        <label for="pVal">Puissance thermique à transporter</label>
+        <div class="combo">
+          <input id="pVal" type="text" inputmode="decimal" placeholder="ex. 10 000" autocomplete="off">
+          <select id="pUnit" aria-label="Unité de puissance"><option value="w">W</option><option value="kw">kW</option></select>
+        </div>
+        <div class="hint">Radiateur, boucle de plancher ou générateur</div>
+      </div>
+
+      <div class="field hidden" id="fQ">
+        <label for="qVal">Débit mesuré ou nominal</label>
+        <div class="combo">
+          <input id="qVal" type="text" inputmode="decimal" placeholder="ex. 0,86" autocomplete="off">
+          <select id="qUnit" aria-label="Unité de débit">
+            <option value="m3h">m³/h</option><option value="lh">L/h</option><option value="lmin">L/min</option><option value="ls">L/s</option>
+          </select>
+        </div>
+        <div class="hint">Relevé au débitmètre, sur la vanne d'équilibrage ou donné par le constructeur</div>
+      </div>
+
+      <div class="field">
+        <label for="regime">Régime d'eau (départ / retour)</label>
+        <select id="regime" class="full"></select>
+      </div>
+
+      <div class="field">
+        <div class="temps">
+          <div><div class="tag"><span class="dot" style="background:var(--accent)"></span>Départ</div>
+            <div class="combo"><input id="tDep" type="text" inputmode="decimal"><span class="unit">°C</span></div></div>
+          <div><div class="tag"><span class="dot" style="background:var(--cold)"></span>Retour</div>
+            <div class="combo"><input id="tRet" type="text" inputmode="decimal"><span class="unit">°C</span></div></div>
+          <div><div class="tag">Écart ΔT</div>
+            <div class="combo"><input id="dT" type="text" inputmode="decimal"><span class="unit">K</span></div></div>
+        </div>
+        <div class="hint" id="regHint"></div>
+      </div>
+
+      <div class="field">
+        <label for="fluide">Fluide caloporteur</label>
+        <select id="fluide" class="full">
+          <option value="eau">Eau — 1,16 kWh/(m³·K)</option>
+          <option value="meg30">Eau + monoéthylène glycol 30 % — 1,072</option>
+          <option value="mpg30">Eau + monopropylène glycol 30 % — 1,092</option>
+          <option value="perso">Coefficient personnalisé…</option>
+        </select>
+        <div class="combo hidden" id="coefWrap" style="margin-top:8px">
+          <input id="coef" type="text" inputmode="decimal" value="1,16"><span class="unit">kWh/(m³·K)</span>
+        </div>
+        <div class="hint">Chaleur volumique ρ·cp du fluide. Glycol à 40 °C ; la surviscosité n'est pas prise en compte.</div>
+      </div>
+
+      <div class="row-actions">
+        <button class="btn" id="resetBtn" type="button">Réinitialiser</button>
+        <button class="btn" id="shareBtn" type="button">Copier le lien</button>
+        <button class="btn" id="printBtn" type="button">Imprimer</button>
+      </div>
+    </div>
+
+    <!-- RÉSULTAT -->
+    <div class="card result" aria-live="polite">
+      <h2>Résultat</h2>
+      <div id="resEmpty" class="empty">Renseignez la puissance et le régime d'eau pour lancer le calcul.</div>
+      <div id="resBox" class="hidden">
+        <div class="big-lbl" id="bigLbl">Débit nécessaire</div>
+        <div class="big" id="big"></div>
+        <div class="conv" id="conv"></div>
+        <div class="formula" id="formula"></div>
+        <div id="notes"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMPARAISON RÉGIMES -->
+  <section class="card more">
+    <h2><span id="cmpTitle">Débit selon le régime d'eau</span></h2>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Régime</th><th class="hide-sm">Usage type</th><th class="n">ΔT</th><th class="n" id="cmpHead">Débit</th></tr></thead>
+        <tbody id="cmpBody"></tbody>
+      </table>
+    </div>
+    <div class="hint">Cliquez sur une ligne pour appliquer ce régime. À puissance égale, diviser le ΔT par deux double le débit.</div>
+  </section>
+
+  <!-- CUMUL ÉMETTEURS -->
+  <section class="card more">
+    <h2>Cumul de plusieurs émetteurs <button class="btn" id="addEm" type="button">+ Ajouter</button></h2>
+    <p class="hint" style="margin:-6px 0 12px">Débit total d'un tronçon ou d'un circulateur, au ΔT et au fluide choisis ci-dessus. Sans foisonnement.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Émetteur</th><th class="n">Puissance (W)</th><th class="n">Débit (L/h)</th><th class="n">m³/h</th><th></th></tr></thead>
+        <tbody id="emBody"></tbody>
+        <tfoot><tr><td>Total</td><td class="n" id="emP">—</td><td class="n" id="emQ">—</td><td class="n" id="emQm">—</td><td></td></tr></tfoot>
+      </table>
+    </div>
+  </section>
+
+  <!-- EXPLICATIONS -->
+  <section class="card more"><div class="prose">
+    <h2>Méthode</h2>
+    <p>La puissance transportée par un circuit d'eau s'écrit <b>P = qv × ρ × cp × ΔT</b>. Avec les unités pratiques du génie climatique :</p>
+    <p class="formula">qv (m³/h) = P (kW) / (1,16 × ΔT)&nbsp;&nbsp;&nbsp;⇄&nbsp;&nbsp;&nbsp;P (kW) = 1,16 × qv (m³/h) × ΔT</p>
+    <p>Le coefficient <b>1,16 kWh/(m³·K)</b> est la chaleur volumique de l'eau : 1 000 kg/m³ × 4 185 J/(kg·K) / 3 600 000 ≈ 1,1625. Élever 1 m³ d'eau de 1 °C demande environ 1,16 kWh.</p>
+    <p><b>Exemple :</b> chaudière de 20 kW en régime 80/60 (ΔT = 20 K) → qv = 20 / (1,16 × 20) = 0,862 m³/h, soit 862 L/h ou 0,24 L/s.</p>
+
+    <details><summary>Quel ΔT retenir ?</summary>
+      <p>Les chaudières à condensation recherchent un retour le plus froid possible (ΔT ≈ 20 K). Les pompes à chaleur et planchers chauffants demandent au contraire un ΔT faible (5 à 8 K) et donc un débit nettement plus élevé : une boucle de 8 kW appelle 0,34 m³/h en 90/70 mais 1,38 m³/h en 40/35.</p>
+      <p>La puissance catalogue des radiateurs est donnée selon la NF EN 442-2 pour un écart de 50 K (régime 75/65, ambiance 20 °C). Hors de ces conditions, corrigez la puissance <i>avant</i> de calculer le débit.</p>
+    </details>
+    <details><summary>Calcul inverse : diagnostiquer un réseau</summary>
+      <p>Un radiateur de 1 500 W en 70/50 demande 0,065 m³/h. Si l'on mesure 0,13 m³/h mais seulement 8 °C d'écart, il ne rend que 1,16 × 0,13 × 8 = 1,2 kW : le surdébit écrase le ΔT sans compenser. Un écart persistant entre ΔT mesuré et ΔT de conception signale un réseau déséquilibré.</p>
+    </details>
+    <details><summary>Fluide glycolé</summary>
+      <p>Le glycol transporte moins de chaleur à volume égal : à 40 °C, ρ·cp vaut 1,072 kWh/(m³·K) en MEG 30 % (+8 % de débit) et 1,092 en MPG 30 % (+6 %). Les pertes de charge augmentent bien plus vite que le débit à cause de la viscosité : le circulateur se dimensionne à part.</p>
+    </details>
+    <details><summary>Limites de validité</summary>
+      <ul>
+        <li>Le coefficient 1,16 correspond à l'eau vers 20 °C. Sur les régimes chauds la chaleur volumique baisse : le débit réel est ~2 % plus élevé à 70 °C, ~3 % à 90 °C.</li>
+        <li>La puissance saisie est reprise telle quelle (pas de correction de la loi d'émission).</li>
+        <li>En sens inverse, entrez le ΔT réellement mesuré, pas celui du régime nominal.</li>
+      </ul>
+    </details>
+    <p class="muted" style="font-size:.85rem;margin-top:14px">Références : NF EN 12828+A1 (conception des systèmes de chauffage à eau), NF EN 442-2 (puissance des radiateurs), ASHRAE Handbook — Fundamentals (propriétés des fluides glycolés).</p>
+  </div></section>
+
+  <footer>Outil libre, calcul côté navigateur. Résultats indicatifs : vérifiez-les avant toute mise en œuvre.</footer>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="calc.js"></script>
+<script>
+(function(){
+'use strict';
+var C = window.Calc;
+var $ = function(id){ return document.getElementById(id); };
+var fmtN = function(v, d, min){ return v.toLocaleString('fr-FR', {minimumFractionDigits:min === undefined ? d : min, maximumFractionDigits:d}); };
+function smart(v){ // chiffres significatifs adaptés
+  var a = Math.abs(v);
+  var d = a >= 1000 ? 0 : a >= 100 ? 1 : a >= 10 ? 2 : a >= 1 ? 3 : a >= 0.1 ? 3 : 4;
+  return fmtN(v, d, 0);
+}
+function setNum(el, v){ el.value = (Math.round(v*1000)/1000).toString().replace('.', ','); }
+
+var DEFAULTS = { mode:'p2q', p:'', pu:'w', q:'', qu:'m3h', reg:'80/60', dep:'80', ret:'60', fl:'eau', coef:'1,16' };
+var state = Object.assign({}, DEFAULTS);
+var emitters = [];
+
+// Régimes
+var regSel = $('regime');
+C.REGIMES.forEach(function(r){
+  var o = document.createElement('option'); o.value = r.id;
+  o.textContent = r.id + ' °C — ' + r.label + ' (ΔT ' + (r.dep - r.ret) + ' K)';
+  regSel.appendChild(o);
+});
+var oP = document.createElement('option'); oP.value = 'perso'; oP.textContent = 'Personnalisé'; regSel.appendChild(oP);
+
+function coef(){
+  if (state.fl === 'perso') return C.num(state.coef);
+  return C.FLUIDES[state.fl].coef;
+}
+function dT(){ return C.num(state.dep) - C.num(state.ret); }
+
+function syncInputs(){
+  document.querySelectorAll('.seg button').forEach(function(b){ b.setAttribute('aria-pressed', b.dataset.mode === state.mode); });
+  $('fP').classList.toggle('hidden', state.mode !== 'p2q');
+  $('fQ').classList.toggle('hidden', state.mode !== 'q2p');
+  $('pVal').value = state.p; $('pUnit').value = state.pu;
+  $('qVal').value = state.q; $('qUnit').value = state.qu;
+  regSel.value = state.reg; $('tDep').value = state.dep; $('tRet').value = state.ret;
+  var d = dT(); $('dT').value = isFinite(d) ? String(Math.round(d*100)/100).replace('.', ',') : '';
+  $('fluide').value = state.fl; $('coef').value = state.coef;
+  $('coefWrap').classList.toggle('hidden', state.fl !== 'perso');
+}
+
+function matchRegime(){
+  var dep = C.num(state.dep), ret = C.num(state.ret);
+  var r = C.REGIMES.filter(function(x){ return x.dep === dep && x.ret === ret; })[0];
+  state.reg = r ? r.id : 'perso';
+  regSel.value = state.reg;
+}
+
+function compute(){
+  var k = coef(), d = dT(), notes = [];
+  var pKw = C.versKw(state.p, state.pu), qM = C.versM3h(state.q, state.qu);
+  var r = C.REGIMES.filter(function(x){ return x.id === state.reg; })[0];
+  $('regHint').textContent = r ? r.label : 'Régime personnalisé';
+
+  var box = $('resBox'), empty = $('resEmpty');
+  var valid = false;
+
+  if (state.mode === 'p2q') {
+    var q = C.debit(pKw, d, k);
+    $('cmpTitle').textContent = 'Débit selon le régime d’eau' + (isFinite(pKw) && pKw > 0 ? ' pour ' + smart(pKw) + ' kW' : '');
+    $('cmpHead').textContent = 'Débit';
+    if (q !== null) {
+      valid = true;
+      $('bigLbl').textContent = 'Débit nécessaire';
+      $('big').innerHTML = smart(q) + '<small>m³/h</small>';
+      $('conv').innerHTML =
+        '<div><b>' + smart(q*1000) + '</b><span>L/h</span></div>' +
+        '<div><b>' + smart(q*1000/60) + '</b><span>L/min</span></div>' +
+        '<div><b>' + smart(q/3.6) + '</b><span>L/s</span></div>';
+      $('formula').textContent = 'qv = ' + smart(pKw) + ' / (' + fmtN(k,3).replace(/0+$/,'').replace(/,$/,'') + ' × ' + smart(d) + ') = ' + smart(q) + ' m³/h';
+      if (state.fl !== 'eau' && state.fl !== 'perso') {
+        var qe = C.debit(pKw, d, 1.16);
+        notes.push(['info', 'Avec de l’eau pure, le débit serait de ' + smart(qe) + ' m³/h : le glycol impose +' + fmtN((q/qe-1)*100,1) + ' %.']);
+      }
+    }
+  } else {
+    var p = C.puissance(qM, d, k);
+    $('cmpTitle').textContent = 'Puissance selon le ΔT' + (isFinite(qM) && qM > 0 ? ' pour ' + smart(qM) + ' m³/h' : '');
+    $('cmpHead').textContent = 'Puissance';
+    if (p !== null) {
+      valid = true;
+      $('bigLbl').textContent = 'Puissance transportée';
+      $('big').innerHTML = (p >= 1 ? smart(p) + '<small>kW</small>' : fmtN(p*1000,0) + '<small>W</small>');
+      $('conv').innerHTML =
+        '<div><b>' + fmtN(p*1000,0) + '</b><span>W</span></div>' +
+        '<div><b>' + smart(qM*1000) + '</b><span>L/h</span></div>' +
+        '<div><b>' + smart(qM/3.6) + '</b><span>L/s</span></div>';
+      $('formula').textContent = 'P = ' + fmtN(k,3).replace(/0+$/,'').replace(/,$/,'') + ' × ' + smart(qM) + ' × ' + smart(d) + ' = ' + smart(p) + ' kW';
+    }
+  }
+
+  if (valid) {
+    if (d > 25) notes.push(['warn', 'ΔT de ' + smart(d) + ' K : au-delà des régimes usuels (5 à 20 K). Vérifiez les températures saisies.']);
+    if (d < 3) notes.push(['warn', 'ΔT de ' + smart(d) + ' K : très faible, le débit devient important et sensible à l’erreur de mesure.']);
+    if (C.num(state.dep) > 105) notes.push(['warn', 'Départ au-delà de 105 °C : hors du champ de la NF EN 12828.']);
+    if (state.mode === 'q2p') notes.push(['info', 'Entrez le ΔT réellement mesuré sur l’installation, pas celui du régime nominal.']);
+  } else if (!(d > 0) && (state.p || state.q)) {
+    notes = []; empty.textContent = 'Le départ doit être plus chaud que le retour (ΔT > 0).';
+  } else {
+    empty.textContent = state.mode === 'p2q'
+      ? 'Renseignez la puissance et le régime d’eau pour lancer le calcul.'
+      : 'Renseignez le débit et le régime d’eau pour lancer le calcul.';
+  }
+  box.classList.toggle('hidden', !valid);
+  empty.classList.toggle('hidden', valid);
+  $('notes').innerHTML = notes.map(function(n){ return '<div class="note' + (n[0]==='info'?' info':'') + '">' + n[1] + '</div>'; }).join('');
+
+  renderCompare(pKw, qM, k);
+  renderEmitters(d, k);
+  saveHash();
+}
+
+function renderCompare(pKw, qM, k){
+  var rows = C.REGIMES.map(function(r){
+    var d = r.dep - r.ret, val;
+    if (state.mode === 'p2q') { var q = C.debit(pKw, d, k); val = q === null ? '—' : smart(q) + ' m³/h · ' + fmtN(q*1000,0) + ' L/h'; }
+    else { var p = C.puissance(qM, d, k); val = p === null ? '—' : smart(p) + ' kW'; }
+    return '<tr class="pick' + (r.id === state.reg ? ' on' : '') + '" data-reg="' + r.id + '"><td><b>' + r.id + '</b></td><td class="hide-sm">' + r.label + '</td><td class="n">' + d + ' K</td><td class="n">' + val + '</td></tr>';
+  });
+  $('cmpBody').innerHTML = rows.join('');
+}
+
+function renderEmitters(d, k){
+  var body = $('emBody');
+  // ne reconstruit que les cellules de résultat pour garder le focus
+  if (body.children.length !== emitters.length) {
+    body.innerHTML = emitters.map(function(e, i){
+      return '<tr class="em-row" data-i="' + i + '"><td><input class="n" value="' + e.n.replace(/"/g,'&quot;') + '" aria-label="Nom"></td>' +
+        '<td class="n"><input class="p" inputmode="decimal" value="' + e.p + '" aria-label="Puissance W"></td>' +
+        '<td class="n q"></td><td class="n qm"></td><td><button class="x" aria-label="Supprimer">×</button></td></tr>';
+    }).join('');
+  }
+  var totP = 0, totQ = 0, any = false;
+  emitters.forEach(function(e, i){
+    var row = body.children[i];
+    var q = C.debit(C.num(e.p)/1000, d, k);
+    row.querySelector('.q').textContent = q === null ? '—' : fmtN(q*1000, 0);
+    row.querySelector('.qm').textContent = q === null ? '—' : smart(q);
+    if (q !== null) { totP += C.num(e.p); totQ += q; any = true; }
+  });
+  $('emP').textContent = any ? fmtN(totP,0) : '—';
+  $('emQ').textContent = any ? fmtN(totQ*1000,0) : '—';
+  $('emQm').textContent = any ? smart(totQ) : '—';
+}
+
+// Lien partageable
+function saveHash(){
+  var s = new URLSearchParams();
+  Object.keys(state).forEach(function(k){ if (state[k] !== DEFAULTS[k]) s.set(k, state[k]); });
+  if (emitters.length) s.set('em', emitters.map(function(e){ return encodeURIComponent(e.n) + '~' + e.p; }).join('|'));
+  var h = s.toString();
+  try { history.replaceState(null, '', h ? '#' + h : location.pathname + location.search); } catch(e){}
+}
+function loadHash(){
+  var s = new URLSearchParams(location.hash.slice(1));
+  Object.keys(DEFAULTS).forEach(function(k){ if (s.has(k)) state[k] = s.get(k); });
+  if (s.has('em')) emitters = s.get('em').split('|').map(function(x){ var a = x.split('~'); return { n: decodeURIComponent(a[0]||''), p: a[1]||'' }; });
+}
+
+// Événements
+document.querySelectorAll('.seg button').forEach(function(b){
+  b.addEventListener('click', function(){
+    if (state.mode === b.dataset.mode) return;
+    // reporte le résultat courant dans l'autre champ
+    var d = dT(), k = coef();
+    if (b.dataset.mode === 'q2p') {
+      var q = C.debit(C.versKw(state.p, state.pu), d, k);
+      if (q !== null && !state.q) { state.q = String(+C.depuisM3h(q, state.qu).toPrecision(4)).replace('.', ','); }
+    } else {
+      var p = C.puissance(C.versM3h(state.q, state.qu), d, k);
+      if (p !== null && !state.p) { state.p = String(+(state.pu === 'w' ? p*1000 : p).toPrecision(4)).replace('.', ','); }
+    }
+    state.mode = b.dataset.mode; syncInputs(); compute();
+  });
+});
+$('pVal').addEventListener('input', function(e){ state.p = e.target.value; compute(); });
+$('qVal').addEventListener('input', function(e){ state.q = e.target.value; compute(); });
+$('pUnit').addEventListener('change', function(e){
+  var v = C.num(state.p);
+  if (isFinite(v) && state.p !== '') { v = e.target.value === 'kw' ? v/1000 : v*1000; state.p = String(+v.toPrecision(6)).replace('.', ','); }
+  state.pu = e.target.value; syncInputs(); compute();
+});
+$('qUnit').addEventListener('change', function(e){
+  var v = C.versM3h(state.q, state.qu);
+  if (isFinite(v) && state.q !== '') state.q = String(+C.depuisM3h(v, e.target.value).toPrecision(6)).replace('.', ',');
+  state.qu = e.target.value; syncInputs(); compute();
+});
+regSel.addEventListener('change', function(e){
+  var r = C.REGIMES.filter(function(x){ return x.id === e.target.value; })[0];
+  state.reg = e.target.value;
+  if (r) { state.dep = String(r.dep); state.ret = String(r.ret); }
+  syncInputs(); compute();
+});
+$('tDep').addEventListener('input', function(e){ state.dep = e.target.value; matchRegime(); var d = dT(); $('dT').value = isFinite(d) ? String(Math.round(d*100)/100).replace('.', ',') : ''; compute(); });
+$('tRet').addEventListener('input', function(e){ state.ret = e.target.value; matchRegime(); var d = dT(); $('dT').value = isFinite(d) ? String(Math.round(d*100)/100).replace('.', ',') : ''; compute(); });
+$('dT').addEventListener('input', function(e){
+  var d = C.num(e.target.value), dep = C.num(state.dep);
+  if (isFinite(d) && isFinite(dep)) { state.ret = String(Math.round((dep - d)*100)/100).replace('.', ','); $('tRet').value = state.ret; matchRegime(); }
+  compute();
+});
+$('fluide').addEventListener('change', function(e){ state.fl = e.target.value; syncInputs(); compute(); });
+$('coef').addEventListener('input', function(e){ state.coef = e.target.value; compute(); });
+$('cmpBody').addEventListener('click', function(e){
+  var tr = e.target.closest('tr[data-reg]'); if (!tr) return;
+  regSel.value = tr.dataset.reg; regSel.dispatchEvent(new Event('change'));
+});
+$('addEm').addEventListener('click', function(){
+  emitters.push({ n: 'Émetteur ' + (emitters.length + 1), p: '' }); compute();
+  var rows = $('emBody').children; rows[rows.length-1].querySelector('.p').focus();
+});
+$('emBody').addEventListener('input', function(e){
+  var tr = e.target.closest('tr'); if (!tr) return; var i = +tr.dataset.i;
+  if (e.target.classList.contains('p')) emitters[i].p = e.target.value; else emitters[i].n = e.target.value;
+  compute();
+});
+$('emBody').addEventListener('click', function(e){
+  if (!e.target.classList.contains('x')) return;
+  emitters.splice(+e.target.closest('tr').dataset.i, 1);
+  $('emBody').innerHTML = ''; compute();
+});
+$('resetBtn').addEventListener('click', function(){ state = Object.assign({}, DEFAULTS); emitters = []; $('emBody').innerHTML = ''; syncInputs(); compute(); });
+$('printBtn').addEventListener('click', function(){ window.print(); });
+$('shareBtn').addEventListener('click', function(){
+  var url = location.href;
+  var done = function(){ toast('Lien copié'); };
+  if (navigator.clipboard) navigator.clipboard.writeText(url).then(done, function(){ prompt('Copiez ce lien :', url); });
+  else prompt('Copiez ce lien :', url);
+});
+function toast(t){ var el = $('toast'); el.textContent = t; el.classList.add('show'); setTimeout(function(){ el.classList.remove('show'); }, 1600); }
+
+// Thème
+var root = document.documentElement;
+try { var th = localStorage.getItem('theme'); if (th) root.dataset.theme = th; } catch(e){}
+$('themeBtn').addEventListener('click', function(){
+  var dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  root.dataset.theme = dark ? 'light' : 'dark';
+  try { localStorage.setItem('theme', root.dataset.theme); } catch(e){}
+});
+
+loadHash(); syncInputs(); compute();
+})();
+</script>
+</body>
+</html>

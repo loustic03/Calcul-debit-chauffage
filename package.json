@@ -1,0 +1,8 @@
+{
+  "name": "calcul-debit-chauffage",
+  "version": "1.0.0",
+  "description": "Calculateur puissance / débit d'un circuit d'eau de chauffage (ΔT)",
+  "private": true,
+  "scripts": { "test": "node --test test/calc.test.js" },
+  "license": "MIT"
+}
