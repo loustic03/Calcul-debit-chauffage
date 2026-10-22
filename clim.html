@@ -18,7 +18,7 @@
 .room-head{display:flex;gap:8px;align-items:center;margin-bottom:12px}
 .room-head input{flex:1;min-width:0;border:0;border-bottom:1px dashed var(--line);background:transparent;color:var(--ink);font:inherit;font-weight:700;font-size:1rem;padding:4px 2px;outline:none}
 .room-head input:focus{border-bottom-color:var(--accent)}
-.room-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:10px}
+.room-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:10px}
 .room-grid .lbl{font-size:.75rem;color:var(--muted);font-weight:600;margin-bottom:4px}
 .room-grid select{width:100%;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--ink);font:inherit;font-size:.92rem;padding:9px 8px;min-width:0}
 .room-grid .combo input{font-size:.98rem;padding:9px 10px}
@@ -196,7 +196,7 @@ function compute(){
     if (box) box.innerHTML = res
       ? '<div class="hot"><b>' + kWt(res.chaud) + '</b><span>Chaud · ' + fmt(res.tint) + ' °C</span></div>' +
         '<div class="cold"><b>' + kWt(res.froid) + '</b><span>Froid</span></div>' +
-        '<div><b>' + (unit ? fmt(unit.kw, 1) + ' kW' : '> 7,1 kW') + '</b><span>' + (unit ? fmt(unit.btu) + ' BTU/h' : '2 unités') + '</span></div>'
+        '<div><b>' + (unit ? fmt(unit.kw, 1) + ' kW' : '> 7,1 kW') + '</b><span>Clim conseillée · ' + (unit ? fmt(unit.btu) + ' BTU/h' : '2 unités') + '</span></div>'
       : '<div style="grid-column:1/-1"><span>Renseignez la surface et la hauteur.</span></div>';
     if (res) { S += K.num(r.s); C += res.chaud; F += res.froid; n++; }
     rows.push('<tr><td>' + esc(r.n || 'Pièce') + '</td><td class="n">' + (res ? fmt(K.num(r.s), 1) : '—') + '</td><td class="n">' + (res ? fmt(res.chaud) : '—') + '</td><td class="n">' + (res ? fmt(res.froid) : '—') + '</td><td class="n">' + uTxt + '</td></tr>');
