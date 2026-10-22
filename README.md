@@ -35,7 +35,8 @@ qv (m³/h) = P (kW) / (1,16 × ΔT)        P (kW) = 1,16 × qv (m³/h) × ΔT
 Saisie pièce par pièce (type, surface, hauteur, exposition, occupants, sous toiture, grandes baies) avec paramètres du logement (isolation, zone climatique hiver A–I + altitude, climat estival).
 
 - Chaud : `P = G × V × (Tint − Tbase)`, G de 0,55 à 1,6 W/(m³·K) selon l'isolation, Tbase abaissée de 1 °C par 200 m au-dessus de 200 m
-- Froid : `P = V × q × f_expo × f_climat + 100 W/occupant + appareils`, q de 25 à 45 W/m³
+- Froid, méthode par défaut : `P (kW) = (V × 100 BTU + 1 000 BTU × fenêtres) / 3 415`, coefficients modifiables
+- Froid, méthode détaillée : `P = V × q × f_expo × f_climat + 100 W/occupant + appareils`, q de 25 à 45 W/m³
 - Unité conseillée par pièce (2,0 à 7,1 kW / 7 000 à 24 000 BTU), total logement et groupe extérieur avec simultanéité
 
 Méthode d'avant-projet par ratios : ne remplace pas un calcul NF EN 12831 ni un bilan de charges.

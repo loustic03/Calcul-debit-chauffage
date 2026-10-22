@@ -48,3 +48,12 @@ test('entrées invalides → null', () => {
     assert.strictEqual(K.piece({ surface: 10, hauteur: bad }, P), null);
   }
 });
+
+test('méthode BTU : (V × 100 + 1 000 × fenêtres) / 3 415', () => {
+  const r = K.piece({ surface: 30, hauteur: 2.5, type: 'sejour', fenetres: 2 }, { ...P, methode: 'btu', btuM3: 100, btuFen: 1000 });
+  close(r.btu, 9500); close(r.froid, 9500 / 3415 * 1000);
+  const r2 = K.piece({ surface: 30, hauteur: 2.5, fenetres: 2 }, { ...P, methode: 'btu', btuM3: '120', btuFen: '1500' });
+  close(r2.btu, 75 * 120 + 3000);
+  const r3 = K.piece({ surface: 30, hauteur: 2.5 }, { ...P, methode: 'btu' });
+  close(r3.btu, 7500);
+});

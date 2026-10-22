@@ -40,6 +40,7 @@
 .kv:last-child{border-bottom:0}
 .kv b{font-variant-numeric:tabular-nums;text-align:right}
 #recap td,#recap th{padding:7px 6px}
+body.m-btu .only-detail,body.m-detail .only-btu{display:none!important}
 </style>
 </head>
 <body>
@@ -58,13 +59,25 @@
     <div>
       <section class="card">
         <h2>Logement</h2>
+        <div class="field">
+          <span class="lbl">Méthode de calcul du froid</span>
+          <div class="seg" role="group" aria-label="Méthode froid" style="margin-bottom:8px">
+            <button type="button" data-meth="btu" aria-pressed="true">Volume + fenêtres (BTU)</button>
+            <button type="button" data-meth="detail" aria-pressed="false">Détaillée (exposition…)</button>
+          </div>
+          <div class="formula" id="methFormula"></div>
+        </div>
         <div class="params">
+          <div class="field only-btu"><label for="btuM3">BTU par m³</label>
+            <div class="combo"><input id="btuM3" type="text" inputmode="decimal"><span class="unit">BTU/m³</span></div></div>
+          <div class="field only-btu"><label for="btuFen">BTU par fenêtre</label>
+            <div class="combo"><input id="btuFen" type="text" inputmode="decimal"><span class="unit">BTU</span></div></div>
           <div class="field"><label for="iso">Niveau d'isolation</label><select id="iso" class="full"></select></div>
           <div class="field"><label for="zh">Zone climatique hiver</label><select id="zh" class="full"></select></div>
           <div class="field"><label for="alt">Altitude</label>
             <div class="combo"><input id="alt" type="text" inputmode="numeric"><span class="unit">m</span></div>
             <div class="hint" id="tbHint"></div></div>
-          <div class="field"><label for="ze">Climat estival</label><select id="ze" class="full"></select></div>
+          <div class="field only-detail"><label for="ze">Climat estival</label><select id="ze" class="full"></select></div>
           <div class="field"><label for="hsp">Hauteur sous plafond par défaut</label>
             <div class="combo"><input id="hsp" type="text" inputmode="decimal"><span class="unit">m</span></div></div>
         </div>
@@ -116,7 +129,9 @@
     <h2>Méthode</h2>
     <p><b>Chauffage</b> — déperditions : <span class="formula" style="display:inline-block;padding:4px 8px">P = G × V × (T<sub>int</sub> − T<sub>base</sub>)</span></p>
     <p>G est le coefficient volumique de déperditions (de 0,55 W/(m³·K) pour un logement très bien isolé à 1,6 pour un logement ancien non isolé), V le volume de la pièce, T<sub>int</sub> la consigne (19 °C, 20 °C en séjour, 22 °C en salle de bain) et T<sub>base</sub> la température extérieure de base de la zone, abaissée de 1 °C par tranche de 200 m au-dessus de 200 m d'altitude. Pièce sous toiture ou grandes baies : +10 %.</p>
-    <p><b>Climatisation</b> — <span class="formula" style="display:inline-block;padding:4px 8px">P = V × q × f<sub>expo</sub> × f<sub>climat</sub> + 100 W × occupants + appareils</span></p>
+    <p><b>Climatisation, méthode volume + fenêtres (par défaut)</b> — <span class="formula" style="display:inline-block;padding:4px 8px">P (kW) = (V × 100 + 1 000 × fenêtres) / 3 415</span></p>
+    <p>100 BTU/h par m³ de volume, 1 000 BTU/h par fenêtre, convertis en kW (1 kW ≈ 3 415 BTU/h). Les deux coefficients sont modifiables. Exemple : 30 m² × 2,5 m = 75 m³ et 2 fenêtres → 9 500 BTU/h, soit 2,78 kW.</p>
+    <p><b>Climatisation, méthode détaillée</b> — <span class="formula" style="display:inline-block;padding:4px 8px">P = V × q × f<sub>expo</sub> × f<sub>climat</sub> + 100 W × occupants + appareils</span></p>
     <p>q est une charge de référence de 25 à 45 W/m³ selon l'isolation. Exposition : nord ×0,9, est ×1, sud ×1,1, ouest ×1,15 (soleil de fin de journée, le plus pénalisant). Sous toiture ×1,2, grandes baies ×1,15. Cuisine +300 W, bureau +150 W.</p>
     <details><summary>Choisir le climatiseur</summary>
       <p>L'unité conseillée est la plus petite puissance frigorifique nominale du commerce couvrant le besoin (2,0 · 2,5 · 3,5 · 4,2 · 5,0 · 6,0 · 7,1 kW). Les équivalences en BTU/h sont les appellations commerciales usuelles (1 kW ≈ 3 412 BTU/h).</p>
@@ -145,11 +160,11 @@ var esc = function(s){ return String(s).replace(/[&<>"]/g, function(c){ return {
 var kW = function(w){ return w >= 1000 ? fmt(w/1000, 2) + '<small>kW</small>' : fmt(w) + '<small>W</small>'; };
 var kWt = function(w){ return w >= 1000 ? fmt(w/1000, 2) + ' kW' : fmt(w) + ' W'; };
 
-var DEF = { iso:'rt2000', zh:'E', alt:'0', ze:'centre', hsp:'2,5', simu:'100' };
+var DEF = { meth:'btu', btuM3:'100', btuFen:'1000', iso:'rt2000', zh:'E', alt:'0', ze:'centre', hsp:'2,5', simu:'100' };
 var DEF_ROOMS = [
-  { n:'Séjour',    t:'sejour',  s:'30', h:'', e:'S', o:'3', toit:0, baies:1 },
-  { n:'Chambre 1', t:'chambre', s:'12', h:'', e:'E', o:'2', toit:0, baies:0 },
-  { n:'Chambre 2', t:'chambre', s:'10', h:'', e:'O', o:'1', toit:1, baies:0 }
+  { n:'Séjour',    t:'sejour',  s:'30', h:'', e:'S', o:'3', toit:0, baies:1, f:'2' },
+  { n:'Chambre 1', t:'chambre', s:'12', h:'', e:'E', o:'2', toit:0, baies:0, f:'1' },
+  { n:'Chambre 2', t:'chambre', s:'10', h:'', e:'O', o:'1', toit:1, baies:0, f:'1' }
 ];
 var st, rooms;
 function clone(o){ return JSON.parse(JSON.stringify(o)); }
@@ -160,7 +175,12 @@ fill('iso', K.ISOLATION); fill('zh', K.ZONES_HIVER); fill('ze', K.ZONES_ETE);
 var optTypes = Object.keys(K.TYPES).map(function(k){ return '<option value="' + k + '">' + K.TYPES[k].label + '</option>'; }).join('');
 var optExpo  = Object.keys(K.EXPOSITIONS).map(function(k){ return '<option value="' + k + '">' + K.EXPOSITIONS[k].label + '</option>'; }).join('');
 
-function syncGlobal(){ ['iso','zh','alt','ze','hsp','simu'].forEach(function(k){ $(k).value = st[k]; }); }
+function syncGlobal(){
+  ['btuM3','btuFen','iso','zh','alt','ze','hsp','simu'].forEach(function(k){ $(k).value = st[k]; });
+  document.body.classList.toggle('m-btu', st.meth === 'btu');
+  document.body.classList.toggle('m-detail', st.meth !== 'btu');
+  document.querySelectorAll('[data-meth]').forEach(function(b){ b.setAttribute('aria-pressed', b.dataset.meth === st.meth); });
+}
 
 function renderRooms(){
   $('rooms').innerHTML = rooms.map(function(r, i){
@@ -170,8 +190,9 @@ function renderRooms(){
         '<div><div class="lbl">Type</div><select data-k="t">' + optTypes + '</select></div>' +
         '<div><div class="lbl">Surface</div><div class="combo"><input data-k="s" inputmode="decimal" value="' + esc(r.s) + '"><span class="unit">m²</span></div></div>' +
         '<div><div class="lbl">Hauteur</div><div class="combo"><input data-k="h" inputmode="decimal" value="' + esc(r.h) + '" placeholder="' + esc(st.hsp) + '"><span class="unit">m</span></div></div>' +
-        '<div><div class="lbl">Exposition</div><select data-k="e">' + optExpo + '</select></div>' +
-        '<div><div class="lbl">Occupants</div><div class="combo"><input data-k="o" inputmode="numeric" value="' + esc(r.o) + '"><span class="unit">pers.</span></div></div>' +
+        '<div class="only-btu"><div class="lbl">Fenêtres</div><div class="combo"><input data-k="f" inputmode="numeric" value="' + esc(r.f || '0') + '"><span class="unit">nb</span></div></div>' +
+        '<div class="only-detail"><div class="lbl">Exposition</div><select data-k="e">' + optExpo + '</select></div>' +
+        '<div class="only-detail"><div class="lbl">Occupants</div><div class="combo"><input data-k="o" inputmode="numeric" value="' + esc(r.o) + '"><span class="unit">pers.</span></div></div>' +
       '</div>' +
       '<div class="checks"><label><input type="checkbox" data-k="toit"' + (r.toit ? ' checked' : '') + '> Sous toiture / combles</label>' +
       '<label><input type="checkbox" data-k="baies"' + (r.baies ? ' checked' : '') + '> Grandes baies vitrées</label></div>' +
@@ -186,16 +207,20 @@ function renderRooms(){
 function compute(){
   var tb = K.tBase(st.zh, st.alt);
   $('tbHint').textContent = 'Température de base retenue : ' + tb + ' °C';
-  var params = { isolation: st.iso, tbase: tb, zoneEte: st.ze };
+  var params = { isolation: st.iso, tbase: tb, zoneEte: st.ze, methode: st.meth, btuM3: st.btuM3, btuFen: st.btuFen };
+  var kV = K.num(st.btuM3), kF = K.num(st.btuFen);
+  $('methFormula').textContent = st.meth === 'btu'
+    ? 'P froid (kW) = (Volume × ' + (isFinite(kV) ? fmt(kV) : K.BTU_M3) + ' + ' + (isFinite(kF) ? fmt(kF) : K.BTU_FENETRE) + ' × fenêtres) / ' + fmt(K.BTU_PAR_KW)
+    : 'P froid = V × q(isolation) × exposition × climat × toiture × baies + 100 W/occupant + appareils';
   var S = 0, C = 0, F = 0, n = 0, rows = [];
   rooms.forEach(function(r, i){
-    var res = K.piece({ surface:r.s, hauteur: r.h === '' ? st.hsp : r.h, type:r.t, expo:r.e, toit:!!r.toit, baies:!!r.baies, occupants:r.o }, params);
+    var res = K.piece({ surface:r.s, hauteur: r.h === '' ? st.hsp : r.h, type:r.t, expo:r.e, toit:!!r.toit, baies:!!r.baies, occupants:r.o, fenetres:r.f }, params);
     var box = $('rooms').children[i] && $('rooms').children[i].querySelector('.room-res');
     var unit = res ? K.taille(res.froid) : null;
     var uTxt = !res ? '—' : unit ? fmt(unit.kw, 1) + ' kW · ' + fmt(unit.btu) + ' BTU' : '> 7,1 kW : 2 unités';
     if (box) box.innerHTML = res
       ? '<div class="hot"><b>' + kWt(res.chaud) + '</b><span>Chaud · ' + fmt(res.tint) + ' °C</span></div>' +
-        '<div class="cold"><b>' + kWt(res.froid) + '</b><span>Froid</span></div>' +
+        '<div class="cold"><b>' + kWt(res.froid) + '</b><span>Froid · ' + fmt(res.btu) + ' BTU/h</span></div>' +
         '<div><b>' + (unit ? fmt(unit.kw, 1) + ' kW' : '> 7,1 kW') + '</b><span>Clim conseillée · ' + (unit ? fmt(unit.btu) + ' BTU/h' : '2 unités') + '</span></div>'
       : '<div style="grid-column:1/-1"><span>Renseignez la surface et la hauteur.</span></div>';
     if (res) { S += K.num(r.s); C += res.chaud; F += res.froid; n++; }
@@ -219,7 +244,7 @@ function compute(){
 function save(){
   var p = new URLSearchParams();
   Object.keys(st).forEach(function(k){ if (st[k] !== DEF[k]) p.set(k, st[k]); });
-  p.set('p', JSON.stringify(rooms.map(function(r){ return [r.n, r.t, r.s, r.h, r.e, r.o, r.toit ? 1 : 0, r.baies ? 1 : 0]; })));
+  p.set('p', JSON.stringify(rooms.map(function(r){ return [r.n, r.t, r.s, r.h, r.e, r.o, r.toit ? 1 : 0, r.baies ? 1 : 0, r.f]; })));
   try { history.replaceState(null, '', '#' + p.toString()); } catch(e){}
 }
 function load(){
@@ -227,13 +252,14 @@ function load(){
   var p = new URLSearchParams(location.hash.slice(1));
   Object.keys(DEF).forEach(function(k){ if (p.has(k)) st[k] = p.get(k); });
   if (p.has('p')) try {
-    rooms = JSON.parse(p.get('p')).map(function(a){ return { n:a[0]||'', t:a[1]||'autre', s:a[2]||'', h:a[3]||'', e:a[4]||'E', o:a[5]||'0', toit:a[6], baies:a[7] }; });
+    rooms = JSON.parse(p.get('p')).map(function(a){ return { n:a[0]||'', t:a[1]||'autre', s:a[2]||'', h:a[3]||'', e:a[4]||'E', o:a[5]||'0', toit:a[6], baies:a[7], f:a[8] === undefined ? '1' : a[8] }; });
   } catch(e){}
 }
 
 // Événements
 ['iso','zh','ze'].forEach(function(k){ $(k).addEventListener('change', function(e){ st[k] = e.target.value; compute(); }); });
-['alt','simu'].forEach(function(k){ $(k).addEventListener('input', function(e){ st[k] = e.target.value; compute(); }); });
+document.querySelectorAll('[data-meth]').forEach(function(b){ b.addEventListener('click', function(){ st.meth = b.dataset.meth; syncGlobal(); compute(); }); });
+['alt','simu','btuM3','btuFen'].forEach(function(k){ $(k).addEventListener('input', function(e){ st[k] = e.target.value; compute(); }); });
 $('hsp').addEventListener('input', function(e){
   st.hsp = e.target.value;
   document.querySelectorAll('[data-k="h"]').forEach(function(inp){ inp.placeholder = st.hsp; });
@@ -257,7 +283,7 @@ $('rooms').addEventListener('click', function(e){
   rooms.splice(+e.target.closest('.room').dataset.i, 1); renderRooms(); compute();
 });
 $('addRoom').addEventListener('click', function(){
-  rooms.push({ n:'Pièce ' + (rooms.length + 1), t:'chambre', s:'', h:'', e:'E', o:'1', toit:0, baies:0 });
+  rooms.push({ n:'Pièce ' + (rooms.length + 1), t:'chambre', s:'', h:'', e:'E', o:'1', toit:0, baies:0, f:'1' });
   renderRooms(); compute();
   $('rooms').lastElementChild.querySelector('[data-k="s"]').focus();
 });

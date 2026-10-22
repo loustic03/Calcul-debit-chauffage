@@ -3,7 +3,8 @@
  * Chaud : P = G × V × (Tint − Tbase) × majorations
  *   G   : coefficient volumique de déperditions (W/(m³·K)), selon l'isolation
  *   Tbase : température extérieure de base (zone climatique + altitude)
- * Froid : P = V × q × f_expo × f_toit × f_baies × f_zone + apports internes
+ * Froid, méthode « btu » (par défaut) : P (kW) = (V × 100 BTU + 1 000 BTU × fenêtres) / 3 415
+ * Froid, méthode « detail » : P = V × q × f_expo × f_toit × f_baies × f_zone + apports internes
  *   q   : charge volumique de référence (W/m³), selon l'isolation
  *
  * Méthode d'avant-projet : elle ne remplace pas une étude thermique (NF EN 12831 / bilan de charges).
@@ -55,7 +56,8 @@
     autre:   { label: 'Autre',          tint: 19, apport: 0 }
   };
 
-  var W_PAR_OCCUPANT = 100;           // apport sensible + latent moyen d'une personne au repos
+  var BTU_M3 = 100, BTU_FENETRE = 1000, BTU_PAR_KW = 3415;
+  var W_PAR_OCCUPANT = 100;          // apport sensible + latent moyen d'une personne au repos
   var F_TOIT_FROID = 1.2, F_TOIT_CHAUD = 1.1;
   var F_BAIES_FROID = 1.15, F_BAIES_CHAUD = 1.1;
 
@@ -100,12 +102,22 @@
     if (p.toit) chaud *= F_TOIT_CHAUD;
     if (p.baies) chaud *= F_BAIES_CHAUD;
 
-    var froid = V * iso.q * expo.f * ete.f;
-    if (p.toit) froid *= F_TOIT_FROID;
-    if (p.baies) froid *= F_BAIES_FROID;
-    froid += occ * W_PAR_OCCUPANT + type.apport;
+    var froid, btu = null;
+    if (params.methode === 'btu') {
+      // Méthode « métier » : (V × 100 BTU + 1 000 BTU par fenêtre) / 3 415 = kW
+      var kV = num(params.btuM3), kF = num(params.btuFen), nf = num(p.fenetres);
+      if (!(kV >= 0)) kV = BTU_M3; if (!(kF >= 0)) kF = BTU_FENETRE; if (!(nf >= 0)) nf = 0;
+      btu = V * kV + nf * kF;
+      froid = btu / BTU_PAR_KW * 1000;
+    } else {
+      froid = V * iso.q * expo.f * ete.f;
+      if (p.toit) froid *= F_TOIT_FROID;
+      if (p.baies) froid *= F_BAIES_FROID;
+      froid += occ * W_PAR_OCCUPANT + type.apport;
+      btu = froid / 1000 * BTU_PAR_KW;
+    }
 
-    return { volume: V, chaud: chaud, froid: froid, tint: tint };
+    return { volume: V, chaud: chaud, froid: froid, btu: btu, tint: tint };
   }
 
   /** Plus petite taille d'unité intérieure couvrant le besoin froid (W). null si au-delà de la gamme. */
@@ -117,6 +129,7 @@
   var api = {
     ISOLATION: ISOLATION, ZONES_HIVER: ZONES_HIVER, ZONES_ETE: ZONES_ETE, EXPOSITIONS: EXPOSITIONS,
     TYPES: TYPES, TAILLES: TAILLES, W_PAR_OCCUPANT: W_PAR_OCCUPANT,
+    BTU_M3: BTU_M3, BTU_FENETRE: BTU_FENETRE, BTU_PAR_KW: BTU_PAR_KW,
     tBase: tBase, piece: piece, taille: taille, num: num
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
